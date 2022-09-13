@@ -1,0 +1,82 @@
+---
+title: "Forecasting US GNP based on selected time series data"
+author: |
+  | Last name: Zhang
+  | First name: Min 
+  | Student ID: 1004709201
+date: "April 22, 2022"
+output: pdf_document
+fontsize: 10pt
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Abstract:
+
+This academic project will be analyzing adjusted quarterly GNP (Gross National Product) in the United States from January 1947 to March 2002. Overall, we find that Gross National Product in billion dollars has an upward trend, with some setbacks in the economic recession cycle. We also projected GNP for the next 10 quarters by using selected ARIMA model, and the result is generally fit to the actual GNP number in the US.  
+
+## Introduction:
+
+Gross National Product, by definition, measures total values of all final products and services created by a country's residents domestically and overseas. This type of economic measurement led us to think about the validity of the model. Therefore, we used data set 'gnp' from package 'astsa' to illustrate quarterly US GNP after World War II until the beginning of 21st century. Since the data is recorded quarterly in a year, we are interested if there are some quarters that have higher GNP than the rest. When we firstly plotted data set 'gnp', we found it is not stationary which may affect our further analysis, we then did transformation to make it relatively stationary. We also manipulate time series data and forecast next 10 quarters of GNP to compare with the actual recorded numbers.  
+
+## Statistical Methods: 
+
+```{r cars,echo=FALSE}
+library(astsa)
+par(mfrow=c(2,2)) # 2 by 2 layout 
+plot.ts(gnp, main="Figure 1: Quarterly GNP in the US", xlab="Quarters", ylab="GNP in billion dollars")
+plot.ts(diff(gnp), main="Figure 2: Quarterly GNP in the US", xlab="Quarters", ylab="Differenced GNP in billion dollars")
+plot.ts(diff(log(gnp)), main="Figure 3: Quarterly GNP in the US", xlab="Quarters", ylab="diff(log(GNP)) in billion dollars")
+```
+
+By illustrating the seasonally adjusted quarterly GNP in the US, we found out from Figure 1 that the original dataset 'gnp' is not stationary, as the mean of this dataset increases as time passes by. Thus, we chose to do a differencing shown in Figure 2 that the variance of this manipulated dataset changes over time, we therefore stabilized variance by applying a log transformation, and we used time series data from Figure 3 to investigate quarterly GNP in the US by forming a meaningful ARIMA model and forecasting based on this ARIMA model. 
+
+## Results: 
+
+```{r,message=FALSE, echo=FALSE}
+par(mfrow=c(1,2))
+acf(diff(log(gnp))) #MA
+pacf(diff(log(gnp))) #AR
+```
+
+We proposed potential ARIMA models by plotting ACF and PACF of diff(log(gnp)). As shown above, we can observe that PACF cuts off after first and third lag while ACF cuts off after first lag. Thus, we selected two potential ARIMA models - ARIMA(1,1,1) and ARIMA(3,1,1) and will do a further diagnostic analysis to decide the final ARIMA model that will be used for forecast.
+
+```{r,message=FALSE, echo=FALSE}
+(model1 <- sarima(diff(log(gnp)),3,0,1))
+(model2 <- sarima(diff(log(gnp)),0,0,1))
+AIC <- c(model1$AIC, model2$AIC)
+BIC <- c(model1$BIC, model2$BIC)
+table <- data.frame(AIC,BIC)
+rownames(table) <- (c('model1', 'model2'))
+table
+```
+
+To decide which ARIMA model for forecast, we used sarima knowledge to plot diagnostics plots. As observed from model(3,0,1) that the residuals show no significant auto correlations, as they are all cut off. The QQ plot shows the condition of residuals that normal distribution is satisfied, with some potential outliers at both tails. Moreover, the p-values for the Ljung-Box plot are all above the threshold of 0.05, suggesting no significance for residuals which is a good fit for the model. In contrast, the ACF residuals of model(0,0,1) did not entirely cut off and the p-values for the Ljung-Box plot suggests the correlation of residuals as the values are mostly below 0.05 cutoff. The AIC and BIC of both models show significant similarity. Thus, we decide to choose ARIMA(3,1,1) to further investigate and forecast.
+
+```{r,message=FALSE, echo=FALSE}
+predict1 <- sarima.for(log(gnp),10,3,1,1)
+Upper=predict1$pred+qnorm(0.975)*predict1$se
+Lower=predict1$pred-qnorm(0.975)*predict1$se
+originalscale <- exp(predict1$pred)
+Upper=exp(Upper)
+Lower=exp(Lower)
+cbind(Lower,Upper)
+```
+
+As a result, we will use model ARIMA(3,1,1) to forecast next 10 quarters of GNP in the US, with 95% confidence level. It can be seen that GNP in the US would have a gradual increase in next 10 quarters since March 2002, and we are 95% confident that the quarterly GNP will fall into the range listed above. 
+
+```{r,message=FALSE, echo=FALSE}
+gnp.per = mvspec(gnp , log = "yes")
+a <- gnp.per$details[order(gnp.per$details[,3],decreasing=TRUE),]
+a[1,];a[2,];a[3,] #first three dominant frequencies
+(gnp.upper=2*a[1,3]/qchisq(.025 ,2))
+(gnp.lower=2*a[1,3]/qchisq(.975 ,2))
+```
+
+we also performed a periodogram analysis listed above and found the first three predominant periods, with 95% confidence interval at frequencies 0.0178, 0.0356 and 0.0889. Overall, the periodogram has a continuous decreasing trend.
+
+## Discussions: 
+
+There are limitations in this model that can be improved if we have a larger dataset. First of all, in the previous QQ plot, there are some potential outliers that lie at both tails which may influence the dependence order of ARIMA model. We thus could try to identify these outliers and remove those extreme values. Throughout the model selection and forecast, we found that the quarterly GNP in the US from 1947 to 2002 depends on the economic performance both globally and domestically, as GNP measures both final products and services produced in the country and overseas. Thus, during economic recession periods, GNP in the US would also decrease. Moreover, we could potentially forecast more time periods as more forecast data would allow us to verify the model accuracy. For example, we could forecast the GNP during 2008 financial crisis period and to see if our model could accurately predict the quarterly GNP during that time. 
